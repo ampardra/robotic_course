@@ -11,9 +11,10 @@ from pathlib import Path
 def generate_launch_description():
     bringup_dir = get_package_share_directory('robot_description')
     world = os.path.join(bringup_dir , "world", "depot.sdf")
-    sdf_file  =  os.path.join(bringup_dir, 'src', 'description', 'robot.urdf')
+    urdf_file  =  os.path.join(bringup_dir, 'src', 'description', 'robot.urdf')
+    rviz_config_file = os.path.join(bringup_dir, 'config', 'gazebo.rviz')
 
-    with open(sdf_file, 'r') as infp:
+    with open(urdf_file, 'r') as infp:
         robot_desc = infp.read()
 
     start_robot_state_publisher_cmd = Node(
@@ -57,7 +58,6 @@ def generate_launch_description():
         launch_arguments={"gz_args": ["-r -v 4 ", world]}.items(),
     )
 
-    # Spawn the robot in Gazebo
     spawn_entity = Node(
         package="ros_gz_sim",
         executable="create",
@@ -76,7 +76,6 @@ def generate_launch_description():
         output="screen",
     )
 
-    rviz_config_file = os.path.join(bringup_dir, 'config', 'gazebo.rviz')
     rviz_node = Node(
         package='rviz2',
         executable='rviz2',
