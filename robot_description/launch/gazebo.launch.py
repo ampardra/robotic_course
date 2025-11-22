@@ -11,7 +11,7 @@ from pathlib import Path
 def generate_launch_description():
     bringup_dir = get_package_share_directory('robot_description')
     world = os.path.join(bringup_dir , "world", "depot.sdf")
-    urdf_file  =  os.path.join(bringup_dir, 'src', 'description', 'robot.urdf')
+    urdf_file  =  os.path.join(bringup_dir, 'src', 'description', 'test.urdf')
     rviz_config_file = os.path.join(bringup_dir, 'config', 'gazebo.rviz')
 
     with open(urdf_file, 'r') as infp:
@@ -102,7 +102,7 @@ def generate_launch_description():
 
     return LaunchDescription([
         DeclareLaunchArgument('use_sim_time',default_value='True',description='Use sim time if true'),
-        DeclareLaunchArgument('urdf_file',default_value=os.path.join(bringup_dir, 'src', 'description', 'robot.urdf'),description='Whether to start RVIZ'),
+        DeclareLaunchArgument('urdf_file',default_value=os.path.join(bringup_dir, 'src', 'description', 'test.urdf'),description='Whether to start RVIZ'),
         DeclareLaunchArgument('use_robot_state_pub',default_value='True',description='Whether to start the robot state publisher'),
         gz_resource_path,
         gz_sim,bridge,
