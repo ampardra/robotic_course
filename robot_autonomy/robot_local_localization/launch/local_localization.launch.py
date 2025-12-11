@@ -51,12 +51,18 @@ def generate_launch_description():
         output='screen',
         parameters=[{'use_sim_time': True}]
     )
-
+    # 5. Test  Node
+    test_node = Node(
+        package='robot_local_localization',
+        executable='test_node',
+        name='test_node',
+        output='screen'
+    )
 
     # Use TimerAction to delay your nodes slightly to let Gazebo start first
     delayed_nodes = TimerAction(
         period=5.0,
-        actions=[prediction_node, measurement_node, ekf_node]
+        actions=[prediction_node, measurement_node, ekf_node, test_node]
     )
 
     return LaunchDescription([

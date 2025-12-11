@@ -53,10 +53,7 @@ class PredictionNode(Node):
 
     def cmd_callback(self, msg: Twist):
         # --- DEBUG LOG ---
-        # This will print EVERY time a command is received.
-        # If you don't see this, the node is NOT connected.
-        self.get_logger().info(f"Received CMD -> Linear: {msg.linear.x:.2f}, Angular: {msg.angular.z:.2f}")
-        
+      
         self.v = msg.linear.x
         self.omega = msg.angular.z
 
