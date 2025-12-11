@@ -3,15 +3,15 @@ import rclpy
 from rclpy.node import Node
 from geometry_msgs.msg import Twist, TransformStamped, Quaternion
 from nav_msgs.msg import Odometry
-from std_msgs.msg import Header
 import tf2_ros
 import math
+from rclpy.qos import QoSProfile, ReliabilityPolicy
 
 class PredictionNode(Node):
     def __init__(self):
         super().__init__('prediction_node')
 
-        # 1. Declare Parameters
+        # 1. Parameters
         self.declare_parameter('wheel_separation', 0.45)
         self.declare_parameter('wheel_radius', 0.1)
         self.declare_parameter('cmd_vel_topic', '/cmd_vel')
@@ -22,8 +22,6 @@ class PredictionNode(Node):
         self.declare_parameter('update_rate', 50.0)
 
         # 2. Get Parameters
-        self.wheel_sep = self.get_parameter('wheel_separation').value
-        self.wheel_rad = self.get_parameter('wheel_radius').value
         self.cmd_topic = self.get_parameter('cmd_vel_topic').value
         self.odom_topic = self.get_parameter('odom_topic').value
         self.base_frame = self.get_parameter('base_frame').value
@@ -31,27 +29,34 @@ class PredictionNode(Node):
         self.pub_tf = self.get_parameter('publish_tf').value
         self.rate = self.get_parameter('update_rate').value
 
-        # 3. State Variables [x, y, yaw]
+        # 3. State Variables
         self.x = 0.0
         self.y = 0.0
         self.yaw = 0.0
-        
-        # 4. Input Variables
-        self.v = 0.0      # Linear velocity
-        self.omega = 0.0  # Angular velocity
+        self.v = 0.0
+        self.omega = 0.0
         self.last_time = self.get_clock().now()
 
-        # 5. Subscribers & Publishers
-        self.create_subscription(Twist, self.cmd_topic, self.cmd_callback, 10)
+        # 4. Subscriber with BEST EFFORT (Accepts everything)
+        qos_policy = QoSProfile(reliability=ReliabilityPolicy.BEST_EFFORT, depth=10)
+        
+        self.create_subscription(Twist, self.cmd_topic, self.cmd_callback, qos_policy)
+        
         self.odom_pub = self.create_publisher(Odometry, self.odom_topic, 10)
         self.tf_broadcaster = tf2_ros.TransformBroadcaster(self)
 
-        # 6. Timer
+        # 5. Timer
         self.timer = self.create_timer(1.0 / self.rate, self.update)
         
-        self.get_logger().info("Prediction Node Started (No tf_transformations dep)")
+        # DEBUG: Print startup info
+        self.get_logger().warn(f"!!! DEBUG MODE !!! Listening on topic: '{self.cmd_topic}'")
 
     def cmd_callback(self, msg: Twist):
+        # --- DEBUG LOG ---
+        # This will print EVERY time a command is received.
+        # If you don't see this, the node is NOT connected.
+        self.get_logger().info(f"Received CMD -> Linear: {msg.linear.x:.2f}, Angular: {msg.angular.z:.2f}")
+        
         self.v = msg.linear.x
         self.omega = msg.angular.z
 
@@ -60,43 +65,35 @@ class PredictionNode(Node):
         dt = (now - self.last_time).nanoseconds / 1e9
         self.last_time = now
 
-        if dt <= 0: return
+        if dt <= 0.001: return
 
-        # --- Motion Model (Unicycle) ---
-        # If omega is very small, use straight line approximation
+        # --- Motion Model ---
         if abs(self.omega) < 1e-5:
             self.x += self.v * math.cos(self.yaw) * dt
             self.y += self.v * math.sin(self.yaw) * dt
         else:
-            # Exact integration
             r = self.v / self.omega
             self.x += -r * math.sin(self.yaw) + r * math.sin(self.yaw + self.omega * dt)
             self.y += r * math.cos(self.yaw) - r * math.cos(self.yaw + self.omega * dt)
         
         self.yaw += self.omega * dt
-        
-        # Normalize Yaw (-pi to pi)
         self.yaw = math.atan2(math.sin(self.yaw), math.cos(self.yaw))
 
-        # --- Convert Yaw to Quaternion (Manual Math) ---
+        # Output
         q = self.euler_to_quaternion(0, 0, self.yaw)
 
-        # --- Publish Odometry ---
         odom_msg = Odometry()
         odom_msg.header.stamp = now.to_msg()
         odom_msg.header.frame_id = self.odom_frame
         odom_msg.child_frame_id = self.base_frame
-        
         odom_msg.pose.pose.position.x = self.x
         odom_msg.pose.pose.position.y = self.y
         odom_msg.pose.pose.orientation = q
-        
         odom_msg.twist.twist.linear.x = self.v
         odom_msg.twist.twist.angular.z = self.omega
         
         self.odom_pub.publish(odom_msg)
 
-        # --- Publish TF ---
         if self.pub_tf:
             t = TransformStamped()
             t.header.stamp = now.to_msg()
@@ -107,31 +104,24 @@ class PredictionNode(Node):
             t.transform.rotation = q
             self.tf_broadcaster.sendTransform(t)
 
+        # DEBUG LOOP: Uncomment this if you want to see the loop running 
+        # self.get_logger().info(f"Looping: v={self.v}, x={self.x:.2f}")
+
     def euler_to_quaternion(self, roll, pitch, yaw):
-        """
-        Manually convert Euler angles to Quaternion to avoid dependency issues.
-        """
         qx = math.sin(roll/2) * math.cos(pitch/2) * math.cos(yaw/2) - math.cos(roll/2) * math.sin(pitch/2) * math.sin(yaw/2)
         qy = math.cos(roll/2) * math.sin(pitch/2) * math.cos(yaw/2) + math.sin(roll/2) * math.cos(pitch/2) * math.sin(yaw/2)
         qz = math.cos(roll/2) * math.cos(pitch/2) * math.sin(yaw/2) - math.sin(roll/2) * math.sin(pitch/2) * math.cos(yaw/2)
         qw = math.cos(roll/2) * math.cos(pitch/2) * math.cos(yaw/2) + math.sin(roll/2) * math.sin(pitch/2) * math.sin(yaw/2)
-        
-        q = Quaternion()
-        q.x = qx
-        q.y = qy
-        q.z = qz
-        q.w = qw
+        q = Quaternion(x=qx, y=qy, z=qz, w=qw)
         return q
 
 def main(args=None):
     rclpy.init(args=args)
+    node = PredictionNode()
     try:
-        node = PredictionNode()
         rclpy.spin(node)
-    except Exception as e:
-        print(f"Error in Prediction Node: {e}")
+    except KeyboardInterrupt:
+        pass
     finally:
+        node.destroy_node()
         rclpy.shutdown()
-
-if __name__ == '__main__':
-    main()
