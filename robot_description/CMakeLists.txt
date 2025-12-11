@@ -23,6 +23,9 @@ ament_target_dependencies(frame_id_converter_node rclcpp sensor_msgs)
 add_executable(motor_command_node scripts/motor_command.cpp)
 ament_target_dependencies(motor_command_node rclcpp std_msgs)
 
+add_executable(cmd_vel_to_rpm_node scripts/cmd_vel_to_rpm.cpp)
+ament_target_dependencies(cmd_vel_to_rpm_node rclcpp geometry_msgs std_msgs)
+
 add_executable(ekf_diff_imu_node scripts/ekf_diff_imu.cpp)
 target_include_directories(ekf_diff_imu_node PRIVATE ${EIGEN3_INCLUDE_DIRS})
 ament_target_dependencies(ekf_diff_imu_node
@@ -47,6 +50,9 @@ install(
     motor_command_node
     DESTINATION lib/${PROJECT_NAME}
 )
+
+install(TARGETS cmd_vel_to_rpm_node DESTINATION lib/${PROJECT_NAME})
+
 
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
