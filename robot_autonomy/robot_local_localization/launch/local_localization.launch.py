@@ -31,7 +31,6 @@ def generate_launch_description():
     )
 
     # --- 3. Measurement Node ---
-    # Ensure these topics match "ros2 topic list" exactly
     measurement_node = Node(
         package='robot_local_localization',
         executable='measurement_node',
@@ -43,6 +42,16 @@ def generate_launch_description():
             'vo_topic': '/vo/odom'
         }]
     )
+
+    # --- 4. EKF Node ---
+    ekf_node = Node(
+        package='robot_local_localization',
+        executable='ekf_node',
+        name='ekf_node',
+        output='screen',
+        parameters=[{'use_sim_time': True}]
+    )
+
 
     # Use TimerAction to delay your nodes slightly to let Gazebo start first
     delayed_nodes = TimerAction(
